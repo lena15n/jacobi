@@ -25,7 +25,7 @@ public class JacobiJob {
 
         public void map(LongWritable key, Text value, Context context
         ) throws IOException, InterruptedException {
-            LOG.info("============= JACOBI: Inside map ==========================================");
+            /*LOG.info("============= JACOBI: Inside map ==========================================");*/
             final String hashcode = Integer.toHexString(hashCode());
 
             StringTokenizer itr = new StringTokenizer(value.toString());
@@ -36,23 +36,23 @@ public class JacobiJob {
             double betta    = Double.valueOf(itr.nextToken());
             double deltaTao = Double.valueOf(itr.nextToken());
 
-            LOG.info(String.format("============= JACOBI MAP %s: funcTy = %d ", hashcode, functionType));
-            LOG.info(String.format("============= JACOBI MAP %s: k      = %d ", hashcode, k));
-            LOG.info(String.format("============= JACOBI MAP %s: N      = %d ", hashcode, n));
-            LOG.info(String.format("============= JACOBI MAP %s: gamma  = %.5f ", hashcode, gamma));
-            LOG.info(String.format("============= JACOBI MAP %s: betta  = %.5f ", hashcode, betta));
-            LOG.info(String.format("============= JACOBI MAP %s: deltaT = %.5f ", hashcode, deltaTao));
+            /*LOG.info(String.format("============= JACOBI MAP %s: funcTy = %d ", hashcode, functionType));*/
+            /*LOG.info(String.format("============= JACOBI MAP %s: k      = %d ", hashcode, k));*/
+            /*LOG.info(String.format("============= JACOBI MAP %s: N      = %d ", hashcode, n));*/
+            /*LOG.info(String.format("============= JACOBI MAP %s: gamma  = %f ", hashcode, gamma));*/
+            /*LOG.info(String.format("============= JACOBI MAP %s: betta  = %f ", hashcode, betta));*/
+            /*LOG.info(String.format("============= JACOBI MAP %s: deltaT = %f ", hashcode, deltaTao));*/
 
 
-            int parts = 12;//or 13 if n mod parts != 0
+            int parts = 64;
             int partLength = n > parts ? n / parts : n;
 
             for (int i = 0; i < n; i += partLength) {
-                LOG.info(String.format("============= JACOBI MAP %s: Write: key(k a b) = \"%s\", value: \"%d %d %.4f %.4f %.4f\"",
+                LOG.info(String.format("============= JACOBI MAP %s: Write: key(k a b) = \"%s\", value: \"%d %d %.15f %.15f %.15f\"",
                         hashcode, String.format("%d [%d, %d)", k, i, Math.min(i + partLength, n)), functionType, n, betta, deltaTao, gamma));
 
                 context.write(new Text(String.format("%d %d %d", k, i, Math.min(i + partLength, n))),
-                        new Text(String.format("%d %d %.4f %.4f %.4f",
+                        new Text(String.format("%d %d %.15f %.15f %.15f",
                                 functionType, n, gamma, betta, deltaTao)));
             }
         }
@@ -67,7 +67,7 @@ public class JacobiJob {
         public void reduce(Text key, Iterable<Text> values,
                            Context context
         ) throws IOException, InterruptedException {
-            LOG.info("============= JACOBI: Inside reduce ==========================================");
+            /*LOG.info("============= JACOBI: Inside reduce ==========================================");*/
             final String hashcode = Integer.toHexString(hashCode());
 
             String[] keyVals = key.toString().split(" ");
@@ -83,15 +83,15 @@ public class JacobiJob {
             double betta = Double.valueOf(itr.nextToken());
             double deltaTao = Double.valueOf(itr.nextToken());
 
-            LOG.info(String.format("============= JACOBI REDUCE %s: k      = %d ", hashcode, k));
-            LOG.info(String.format("============= JACOBI REDUCE %s: a      = %d ", hashcode, a));
-            LOG.info(String.format("============= JACOBI REDUCE %s: b      = %d ", hashcode, b));
+            /*LOG.info(String.format("============= JACOBI REDUCE %s: k      = %d ", hashcode, k));*/
+            /*LOG.info(String.format("============= JACOBI REDUCE %s: a      = %d ", hashcode, a));*/
+            /*LOG.info(String.format("============= JACOBI REDUCE %s: b      = %d ", hashcode, b));*/
 
-            LOG.info(String.format("============= JACOBI REDUCE %s: funcTy = %d ", hashcode, functionType));
-            LOG.info(String.format("============= JACOBI REDUCE %s: N      = %d ", hashcode, n));
-            LOG.info(String.format("============= JACOBI REDUCE %s: gamma  = %.5f ", hashcode, gamma));
-            LOG.info(String.format("============= JACOBI REDUCE %s: betta  = %.5f ", hashcode, betta));
-            LOG.info(String.format("============= JACOBI REDUCE %s: deltaT = %.5f ", hashcode, deltaTao));
+            /*LOG.info(String.format("============= JACOBI REDUCE %s: funcTy = %d ", hashcode, functionType));*/
+            /*LOG.info(String.format("============= JACOBI REDUCE %s: N      = %d ", hashcode, n));*/
+            /*LOG.info(String.format("============= JACOBI REDUCE %s: gamma  = %.15f ", hashcode, gamma));*/
+            /*LOG.info(String.format("============= JACOBI REDUCE %s: betta  = %.15f ", hashcode, betta));*/
+            /*LOG.info(String.format("============= JACOBI REDUCE %s: deltaT = %.15f ", hashcode, deltaTao));*/
 
             double jacobiResult = 0.0;
             for (int i = a; i < b; i++) {
@@ -109,10 +109,10 @@ public class JacobiJob {
                     }
                     break;
                 }
-                LOG.info(String.format("============= JACOBI REDUCE %s: Write k = %s, jacobi func = %.5f, N = %d",
+                LOG.info(String.format("============= JACOBI REDUCE %s: Write k = %s, jacobi func = %.15f, N = %d",
                         hashcode, key, jacobiResult, n));
 
-                context.write(new Text(String.format("%d %d", k, i)), new Text(String.format("%.5f %d", jacobiResult, n)));
+                context.write(new Text(String.format("%d %d", k, i)), new Text(String.format("%.15f %d", jacobiResult, n)));
             }
         }
 
@@ -283,7 +283,7 @@ public class JacobiJob {
     * */
     public static void main(String[] args) throws Exception {
         final Log LOG = LogFactory.getLog(JacobiJob.class);
-        LOG.info("============= JACOBI: Starting job...");
+        /*LOG.info("============= JACOBI: Starting job...");*/
 
         String localInputFile = args[0];
 
@@ -310,7 +310,7 @@ public class JacobiJob {
                     new Path(outputPath.getName()), true,
                     conf, null);
 
-            LOG.info("============= JACOBI: End job");
+            /*LOG.info("============= JACOBI: End job");*/
         }
     }
 
