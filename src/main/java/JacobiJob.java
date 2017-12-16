@@ -4,7 +4,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
@@ -44,11 +43,15 @@ public class JacobiJob {
             LOG.info(String.format("============= JACOBI MAP %s: betta  = %.5f ", hashcode, betta));
             LOG.info(String.format("============= JACOBI MAP %s: deltaT = %.5f ", hashcode, deltaTao));
 
-            for (int i = 0; i < n; i++) {
-                LOG.info(String.format("============= JACOBI MAP %s: Write: key(k i) = \"%s\", value: \"%d %d %.4f %.4f %.4f\"",
-                        hashcode, String.format("%s %s", k, i), functionType, n, betta, deltaTao, gamma));
 
-                context.write(new Text(String.format("%s %s", k, i)),
+            int parts = 12;//or 13 if n mod parts != 0
+            int partLength = n > parts ? n / parts : n;
+
+            for (int i = 0; i < n; i += partLength) {
+                LOG.info(String.format("============= JACOBI MAP %s: Write: key(k a b) = \"%s\", value: \"%d %d %.4f %.4f %.4f\"",
+                        hashcode, String.format("%d [%d, %d)", k, i, Math.min(i + partLength, n)), functionType, n, betta, deltaTao, gamma));
+
+                context.write(new Text(String.format("%d %d %d", k, i, Math.min(i + partLength, n))),
                         new Text(String.format("%d %d %.4f %.4f %.4f",
                                 functionType, n, gamma, betta, deltaTao)));
             }
@@ -69,7 +72,8 @@ public class JacobiJob {
 
             String[] keyVals = key.toString().split(" ");
             int k = Integer.valueOf(keyVals[0]);
-            int i = Integer.valueOf(keyVals[1]);
+            int a = Integer.valueOf(keyVals[1]);
+            int b = Integer.valueOf(keyVals[2]);
 
             Text value = values.iterator().next();
             StringTokenizer itr = new StringTokenizer(value.toString());
@@ -79,31 +83,44 @@ public class JacobiJob {
             double betta = Double.valueOf(itr.nextToken());
             double deltaTao = Double.valueOf(itr.nextToken());
 
-            LOG.info(String.format("============= JACOBI REDUCE %s: funcTy = %d ", hashcode, functionType));
-            LOG.info(String.format("============= JACOBI REDUCE %s: i      = %d ", hashcode, i));
             LOG.info(String.format("============= JACOBI REDUCE %s: k      = %d ", hashcode, k));
+            LOG.info(String.format("============= JACOBI REDUCE %s: a      = %d ", hashcode, a));
+            LOG.info(String.format("============= JACOBI REDUCE %s: b      = %d ", hashcode, b));
+
+            LOG.info(String.format("============= JACOBI REDUCE %s: funcTy = %d ", hashcode, functionType));
             LOG.info(String.format("============= JACOBI REDUCE %s: N      = %d ", hashcode, n));
             LOG.info(String.format("============= JACOBI REDUCE %s: gamma  = %.5f ", hashcode, gamma));
             LOG.info(String.format("============= JACOBI REDUCE %s: betta  = %.5f ", hashcode, betta));
             LOG.info(String.format("============= JACOBI REDUCE %s: deltaT = %.5f ", hashcode, deltaTao));
 
             double jacobiResult = 0.0;
-            switch (functionType) {
-                case 0: { jacobiResult = derivate(k, betta, deltaTao * i, gamma); } break;
-                case 1: { jacobiResult = p(k, betta, deltaTao * i, gamma); } break;
-                case 2: { jacobiResult = integral(k, betta, deltaTao * i, gamma); } break;
-            }
-            LOG.info(String.format("============= JACOBI REDUCE %s: Write k = %s, jacobi func = %.5f, N = %d",
-                    hashcode, key, jacobiResult, n));
+            for (int i = a; i < b; i++) {
+                switch (functionType) {
+                    case 0: {
+                        jacobiResult = derivate(k, betta, deltaTao * i, gamma);
+                    }
+                    break;
+                    case 1: {
+                        jacobiResult = p(k, betta, deltaTao * i, gamma);
+                    }
+                    break;
+                    case 2: {
+                        jacobiResult = integral(k, betta, deltaTao * i, gamma);
+                    }
+                    break;
+                }
+                LOG.info(String.format("============= JACOBI REDUCE %s: Write k = %s, jacobi func = %.5f, N = %d",
+                        hashcode, key, jacobiResult, n));
 
-            context.write(key, new Text(String.format("%.5f %d", jacobiResult, n)));
+                context.write(new Text(String.format("%d %d", k, i)), new Text(String.format("%.5f %d", jacobiResult, n)));
+            }
         }
 
         private static double derivate(int k, double betta, double tao, double gamma) {
             double sum = 0;
             double sign = 1;
             for (int s = 0; s <= k; s++) {
-                sum += sign * doubleC(k, s) * doubleC(k + s + betta, s) * pow(2 * s + 1, 1) * Math.exp(-(2 * s + 1) * C * gamma * tao / 2);
+                sum += sign * C(k, s) * doubleC(k + s + betta, s) * pow(2 * s + 1, 1) * Math.exp(-(2 * s + 1) * C * gamma * tao / 2);
                 sign *= -1;
             }
             return pow(-C * gamma / 2, 1) * sum;
@@ -113,7 +130,7 @@ public class JacobiJob {
             double res = 0;
             int sign = 1;
             for (int s = 0; s <= k; s++) {
-                res += doubleC(k, s) * doubleC(k + s + betta, s) * sign * Math.exp(-(2 * s + 1) * 2 * gamma * tao / 2);
+                res += C(k, s) * doubleC(k + s + betta, s) * sign * Math.exp(-(2 * s + 1) * 2 * gamma * tao / 2);
                 sign *= -1;
             }
             return res;
@@ -124,7 +141,7 @@ public class JacobiJob {
             double res = 0;
             double sign = 1;
             for (int s = 0; s <= k; s++) {
-                double binoms = doubleC(k, s) * doubleC(k + s + betta, s);
+                double binoms = C(k, s) * doubleC(k + s + betta, s);
                 double exps = sign * Math.exp(-(2 * s + 1) * C * gamma * tao / 2);
                 double rowSum = 0;
                 for (int j = 0; j <= n; j++) {
@@ -134,6 +151,13 @@ public class JacobiJob {
                 sign *= -1;
             }
             return res;
+        }
+
+        private static double[][] cacheC = new double[100][100];
+
+        static double C(int n, int k) {
+            if (cacheC[n][k] != 0) return cacheC[n][k];
+            return cacheC[n][k] = f(n) / f(k) / f(n - k);
         }
 
         private static double f(int n) {
@@ -252,11 +276,11 @@ public class JacobiJob {
     }
 
     /**
-     * @param args <br>
-     *       args[0] Path to input file in local file system<br>
-     *       args[1] Output file name (without extension pls)
-     *
-     * */
+    * @param args <br>
+    *       args[0] Path to input file in local file system<br>
+    *       args[1] Output file name (without extension pls)
+    *
+    * */
     public static void main(String[] args) throws Exception {
         final Log LOG = LogFactory.getLog(JacobiJob.class);
         LOG.info("============= JACOBI: Starting job...");
