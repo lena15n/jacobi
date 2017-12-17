@@ -1,6 +1,7 @@
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
@@ -11,21 +12,27 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.chain.ChainMapper;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.KeyValueTextInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.MultipleInputs;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.log4j.Logger;
 
+import java.io.File;
 import java.io.IOException;
+import java.util.Scanner;
 import java.util.StringTokenizer;
 
 public class JacobiJob {
 
-    public static class JacobiMapper1
-            extends Mapper<LongWritable, Text, Text, Text> {
+    public static class JacobiMapper2
+            extends Mapper<Text, Text, Text, Text> {
 
-        private Logger LOG = Logger.getLogger(JacobiMapper1.class);
+        private Logger LOG = Logger.getLogger(JacobiJob.JacobiMapper2.class);
 
-        public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+        public void map(Text key, Text value, Context context) throws IOException, InterruptedException {
             final String hashcode = Integer.toHexString(hashCode());
+            LOG.info(String.format("============= JACOBI MAP %s", hashcode));
 
             StringTokenizer itr = new StringTokenizer(value.toString());
             int functionType= Integer.valueOf(itr.nextToken());
@@ -35,38 +42,7 @@ public class JacobiJob {
             double betta    = Double.valueOf(itr.nextToken());
             double deltaTao = Double.valueOf(itr.nextToken());
 
-            int parts = 64;
-            int partLength = n > parts ? n / parts : n;
-
-            for (int i = 0; i < n; i += partLength) {
-                context.write(new Text(String.format("%d %d %d", k, i, Math.min(i + partLength, n))),
-                        new Text(String.format("%d %d %.15f %.15f %.15f",
-                                functionType, n, gamma, betta, deltaTao)));
-            }
-        }
-    }
-
-    public static class JacobiMapper2
-            extends Mapper<Text, Text, Text, Text> {
-
-        private Logger LOG = Logger.getLogger(JacobiJob.JacobiMapper2.class);
-
-        public void map(Text key, Text value, Context context) throws IOException, InterruptedException {
-            final String hashcode = Integer.toHexString(hashCode());
-
-            String[] keyVals = key.toString().split(" ");
-            int k = Integer.valueOf(keyVals[0]);
-            int a = Integer.valueOf(keyVals[1]);
-            int b = Integer.valueOf(keyVals[2]);
-
-            StringTokenizer itr = new StringTokenizer(value.toString());
-            int functionType = Integer.valueOf(itr.nextToken());
-            int n = Integer.valueOf(itr.nextToken());
-            double gamma = Double.valueOf(itr.nextToken());
-            double betta = Double.valueOf(itr.nextToken());
-            double deltaTao = Double.valueOf(itr.nextToken());
-
-            for (int i = a; i < b; i++) {
+            for (int i = 0; i < n; i++) {
                 double jacobiResult = 0.0;
 
                 switch (functionType) {
@@ -267,23 +243,33 @@ public class JacobiJob {
 
         Configuration conf = new Configuration();
         FileSystem hdfs = FileSystem.get(conf);
-        Path inputPath = putInputFileInHdfs(hdfs, localInputFile);
         Path outputPath = prepareOutputFolder(hdfs, args[1]);
         Job job = Job.getInstance(conf, "Jacobi job");
-
-        Configuration splitMap1Config = new Configuration(false);
-        ChainMapper.addMapper(job, JacobiJob.JacobiMapper1.class, LongWritable.class, Text.class, Text.class, Text.class, splitMap1Config);
-        Configuration splitMap2Config = new Configuration(false);
-        ChainMapper.addMapper(job, JacobiJob.JacobiMapper2.class, Text.class, Text.class, Text.class, Text.class, splitMap2Config);
-
         job.setJarByClass(JacobiJob.class);
-        //job.setMapperClass(JacobiJob.JacobiMapper1.class);
         job.setReducerClass(JacobiReducer.class);
-        job.setMapOutputKeyClass(Text.class);
-        job.setMapOutputValueClass(Text.class);
-        job.setNumReduceTasks(0);//setNumReduceTasks(3);
-        FileInputFormat.addInputPath(job, inputPath);
+        job.setNumReduceTasks(0);
         FileOutputFormat.setOutputPath(job, outputPath);
+
+        //TODO: hack
+        String inputFolderName = "jacobi-in";
+        if (hdfs.exists(new Path(inputFolderName))) {
+            hdfs.delete(new Path(inputFolderName), true);
+        }
+
+        Scanner sc = new Scanner(new File(localInputFile));
+        int i = 0;
+        while (sc.hasNext()) {
+            Path inputPath = new Path(inputFolderName + "/" + localInputFile + i);
+            FSDataOutputStream fos = hdfs.create(inputPath);
+            fos.getWrappedStream().write(sc.nextLine().getBytes());
+            fos.close();
+
+            MultipleInputs.addInputPath(job, inputPath, KeyValueTextInputFormat.class, JacobiMapper2.class);
+
+            i++;
+        }
+        sc.close();
+        //TODO: hack
 
         if (job.waitForCompletion(true)) {
             // Merge part-r-00000 files after Reduce phase into one file,
@@ -293,17 +279,6 @@ public class JacobiJob {
                     new Path(outputPath.getName()), true,
                     conf, null);
         }
-    }
-
-    private static Path putInputFileInHdfs(FileSystem hdfs, String file) throws IOException {
-        String inputFolderName = "jacobi-in";
-        if (!hdfs.exists(new Path(inputFolderName))) {
-            hdfs.create(new Path(inputFolderName));
-        }
-        Path inputPath = new Path(inputFolderName + "/" + file);
-        hdfs.copyFromLocalFile(false, true, new Path(file), inputPath);
-
-        return inputPath;
     }
 
     private static Path prepareOutputFolder(FileSystem hdfs, String output) throws IOException {
