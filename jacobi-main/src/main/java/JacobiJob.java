@@ -25,8 +25,7 @@ import java.util.StringTokenizer;
 
 public class JacobiJob {
 
-    public static class JacobiMapper2
-            extends Mapper<Text, Text, Text, Text> {
+    public static class JacobiMapper2  extends Mapper<Text, Text, Text, Text> {
 
         private Logger LOG = Logger.getLogger(JacobiJob.JacobiMapper2.class);
 
@@ -231,11 +230,11 @@ public class JacobiJob {
     }
 
     /**
-    * @param args <br>
-    *       args[0] Path to input file in local file system<br>
-    *       args[1] Output file name (without extension pls)
-    *
-    * */
+     * @param args <br>
+     *       args[0] Path to input file in local file system<br>
+     *       args[1] Output file name (without extension pls)
+     *
+     * */
     public static void main(String[] args) throws Exception {
         final Log LOG = LogFactory.getLog(JacobiJob.class);
 

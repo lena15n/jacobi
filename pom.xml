@@ -6,7 +6,13 @@
 
     <groupId>jacobi.group</groupId>
     <artifactId>jacobi</artifactId>
+    <packaging>pom</packaging>
     <version>1.0-SNAPSHOT</version>
+    <modules>
+        <module>transpmultinvert</module>
+        <module>transp</module>
+        <module>jacobi.main</module>
+    </modules>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
