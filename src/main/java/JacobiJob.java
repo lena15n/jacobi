@@ -9,6 +9,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.chain.ChainMapper;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.log4j.Logger;
@@ -18,14 +19,12 @@ import java.util.StringTokenizer;
 
 public class JacobiJob {
 
-    public static class JacobiMapper
+    public static class JacobiMapper1
             extends Mapper<LongWritable, Text, Text, Text> {
 
-        private Logger LOG = Logger.getLogger(JacobiMapper.class);
+        private Logger LOG = Logger.getLogger(JacobiMapper1.class);
 
-        public void map(LongWritable key, Text value, Context context
-        ) throws IOException, InterruptedException {
-            /*LOG.info("============= JACOBI: Inside map ==========================================");*/
+        public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
             final String hashcode = Integer.toHexString(hashCode());
 
             StringTokenizer itr = new StringTokenizer(value.toString());
@@ -36,21 +35,10 @@ public class JacobiJob {
             double betta    = Double.valueOf(itr.nextToken());
             double deltaTao = Double.valueOf(itr.nextToken());
 
-            /*LOG.info(String.format("============= JACOBI MAP %s: funcTy = %d ", hashcode, functionType));*/
-            /*LOG.info(String.format("============= JACOBI MAP %s: k      = %d ", hashcode, k));*/
-            /*LOG.info(String.format("============= JACOBI MAP %s: N      = %d ", hashcode, n));*/
-            /*LOG.info(String.format("============= JACOBI MAP %s: gamma  = %f ", hashcode, gamma));*/
-            /*LOG.info(String.format("============= JACOBI MAP %s: betta  = %f ", hashcode, betta));*/
-            /*LOG.info(String.format("============= JACOBI MAP %s: deltaT = %f ", hashcode, deltaTao));*/
-
-
             int parts = 64;
             int partLength = n > parts ? n / parts : n;
 
             for (int i = 0; i < n; i += partLength) {
-                LOG.info(String.format("============= JACOBI MAP %s: Write: key(k a b) = \"%s\", value: \"%d %d %.15f %.15f %.15f\"",
-                        hashcode, String.format("%d [%d, %d)", k, i, Math.min(i + partLength, n)), functionType, n, betta, deltaTao, gamma));
-
                 context.write(new Text(String.format("%d %d %d", k, i, Math.min(i + partLength, n))),
                         new Text(String.format("%d %d %.15f %.15f %.15f",
                                 functionType, n, gamma, betta, deltaTao)));
@@ -58,16 +46,12 @@ public class JacobiJob {
         }
     }
 
-    public static class JacobiReducer
-            extends Reducer<Text, Text, Text, Text> {
+    public static class JacobiMapper2
+            extends Mapper<Text, Text, Text, Text> {
 
-        private static final Log LOG = LogFactory.getLog(JacobiReducer.class);
-        private static final double C = 2;
+        private Logger LOG = Logger.getLogger(JacobiJob.JacobiMapper2.class);
 
-        public void reduce(Text key, Iterable<Text> values,
-                           Context context
-        ) throws IOException, InterruptedException {
-            /*LOG.info("============= JACOBI: Inside reduce ==========================================");*/
+        public void map(Text key, Text value, Context context) throws IOException, InterruptedException {
             final String hashcode = Integer.toHexString(hashCode());
 
             String[] keyVals = key.toString().split(" ");
@@ -75,7 +59,6 @@ public class JacobiJob {
             int a = Integer.valueOf(keyVals[1]);
             int b = Integer.valueOf(keyVals[2]);
 
-            Text value = values.iterator().next();
             StringTokenizer itr = new StringTokenizer(value.toString());
             int functionType = Integer.valueOf(itr.nextToken());
             int n = Integer.valueOf(itr.nextToken());
@@ -83,18 +66,9 @@ public class JacobiJob {
             double betta = Double.valueOf(itr.nextToken());
             double deltaTao = Double.valueOf(itr.nextToken());
 
-            /*LOG.info(String.format("============= JACOBI REDUCE %s: k      = %d ", hashcode, k));*/
-            /*LOG.info(String.format("============= JACOBI REDUCE %s: a      = %d ", hashcode, a));*/
-            /*LOG.info(String.format("============= JACOBI REDUCE %s: b      = %d ", hashcode, b));*/
-
-            /*LOG.info(String.format("============= JACOBI REDUCE %s: funcTy = %d ", hashcode, functionType));*/
-            /*LOG.info(String.format("============= JACOBI REDUCE %s: N      = %d ", hashcode, n));*/
-            /*LOG.info(String.format("============= JACOBI REDUCE %s: gamma  = %.15f ", hashcode, gamma));*/
-            /*LOG.info(String.format("============= JACOBI REDUCE %s: betta  = %.15f ", hashcode, betta));*/
-            /*LOG.info(String.format("============= JACOBI REDUCE %s: deltaT = %.15f ", hashcode, deltaTao));*/
-
-            double jacobiResult = 0.0;
             for (int i = a; i < b; i++) {
+                double jacobiResult = 0.0;
+
                 switch (functionType) {
                     case 0: {
                         jacobiResult = derivate(k, betta, deltaTao * i, gamma);
@@ -109,12 +83,11 @@ public class JacobiJob {
                     }
                     break;
                 }
-                LOG.info(String.format("============= JACOBI REDUCE %s: Write k = %s, jacobi func = %.15f, N = %d",
-                        hashcode, key, jacobiResult, n));
-
                 context.write(new Text(String.format("%d %d", k, i)), new Text(String.format("%.15f %d", jacobiResult, n)));
             }
         }
+
+        private static final double C = 2;
 
         private static double derivate(int k, double betta, double tao, double gamma) {
             double sum = 0;
@@ -275,6 +248,12 @@ public class JacobiJob {
         }
     }
 
+    public static class JacobiReducer
+            extends Reducer<Text, Text, Text, Text> {
+        public void reduce(Text key, Iterable<Text> values,
+                           Context context) throws IOException, InterruptedException {}
+    }
+
     /**
     * @param args <br>
     *       args[0] Path to input file in local file system<br>
@@ -283,7 +262,6 @@ public class JacobiJob {
     * */
     public static void main(String[] args) throws Exception {
         final Log LOG = LogFactory.getLog(JacobiJob.class);
-        /*LOG.info("============= JACOBI: Starting job...");*/
 
         String localInputFile = args[0];
 
@@ -291,14 +269,19 @@ public class JacobiJob {
         FileSystem hdfs = FileSystem.get(conf);
         Path inputPath = putInputFileInHdfs(hdfs, localInputFile);
         Path outputPath = prepareOutputFolder(hdfs, args[1]);
-
         Job job = Job.getInstance(conf, "Jacobi job");
+
+        Configuration splitMap1Config = new Configuration(false);
+        ChainMapper.addMapper(job, JacobiJob.JacobiMapper1.class, LongWritable.class, Text.class, Text.class, Text.class, splitMap1Config);
+        Configuration splitMap2Config = new Configuration(false);
+        ChainMapper.addMapper(job, JacobiJob.JacobiMapper2.class, Text.class, Text.class, Text.class, Text.class, splitMap2Config);
+
         job.setJarByClass(JacobiJob.class);
-        job.setMapperClass(JacobiMapper.class);
+        //job.setMapperClass(JacobiJob.JacobiMapper1.class);
         job.setReducerClass(JacobiReducer.class);
         job.setMapOutputKeyClass(Text.class);
         job.setMapOutputValueClass(Text.class);
-        job.setNumReduceTasks(3);
+        job.setNumReduceTasks(0);//setNumReduceTasks(3);
         FileInputFormat.addInputPath(job, inputPath);
         FileOutputFormat.setOutputPath(job, outputPath);
 
@@ -309,8 +292,6 @@ public class JacobiJob {
             FileUtil.copyMerge(hdfs, outputPath, FileSystem.getLocal(conf),
                     new Path(outputPath.getName()), true,
                     conf, null);
-
-            /*LOG.info("============= JACOBI: End job");*/
         }
     }
 
