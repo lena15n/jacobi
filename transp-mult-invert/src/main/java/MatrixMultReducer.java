@@ -1,13 +1,12 @@
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
-import java.util.HashMap;
 
-public class MatrixMultReducer extends Reducer<Text, Text, Text, Text> {
+public class MatrixMultReducer
+        extends Reducer<Text, Text, Text, Text> {
     private Logger LOG = Logger.getLogger(MatrixMultReducer.class);
 
     public void reduce(Text key, Iterable<Text> values,
@@ -17,7 +16,7 @@ public class MatrixMultReducer extends Reducer<Text, Text, Text, Text> {
 
         Configuration conf = context.getConfiguration();
         int columnsA = conf.getInt("columnsA", 0);
-        int rowsB = conf.getInt("rowsA", 0);
+        int rowsB = conf.getInt("columnsA", 0);
 
         double[] rowA = new double[columnsA];
         double[] columnB = new double[rowsB];
