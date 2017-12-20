@@ -45,13 +45,12 @@ public class MatrMultTranspInvertJob {
         Path inputPath = putInputFileInHdfs(hdfs, tranInFolder, localInputFile);
         Path transpOutputPath = prepareOutputFolder(hdfs, tranOutFolder);
 
-        Job transpJob = Job.getInstance(transpConf, "Matrix Transposing");
-        transpJob.setJarByClass(MatrMultTranspInvertJob.class);//.setJar("target/transp-mult-invert.jar");
+        Job transpJob = Job.getInstance(transpConf, "Part 1: Matrix Transposing");
+        transpJob.setJarByClass(MatrMultTranspInvertJob.class);
         transpJob.setMapperClass(MatrixTransposingMapper.class);
         transpJob.setReducerClass(MatrixTransposingReducer.class);
         transpJob.setMapOutputKeyClass(IntWritable.class);
         transpJob.setMapOutputValueClass(Text.class);
-        transpJob.setNumReduceTasks(3);
         transpJob.setInputFormatClass(KeyValueTextInputFormat.class);
         FileInputFormat.addInputPath(transpJob, inputPath);
         FileOutputFormat.setOutputPath(transpJob, transpOutputPath);
@@ -60,8 +59,8 @@ public class MatrMultTranspInvertJob {
             Configuration multConf = new Configuration();
             multConf.setInt("rowsA", Integer.valueOf(args[2]));
             multConf.setInt("columnsA", Integer.valueOf(args[3]));
-            Job multJob = Job.getInstance(multConf, "Matrix Multiplication");
-            multJob.setJarByClass(MatrMultTranspInvertJob.class);//.setJar("target/transp-mult-invert.jar");
+            Job multJob = Job.getInstance(multConf, "Part 2: Matrix Multiplication");
+            multJob.setJarByClass(MatrMultTranspInvertJob.class);
             MultipleInputs.addInputPath(multJob, inputPath, KeyValueTextInputFormat.class, MatrixMultMapperA.class);
             MultipleInputs.addInputPath(multJob, transpOutputPath, KeyValueTextInputFormat.class, MatrixMultMapperB.class);
             Path outputPath = prepareOutputFolder(hdfs, args[1]);
@@ -69,7 +68,6 @@ public class MatrMultTranspInvertJob {
             multJob.setMapOutputValueClass(Text.class);
             FileOutputFormat.setOutputPath(multJob, outputPath);
             multJob.setReducerClass(MatrixMultReducer.class);
-            //multJob.setNumReduceTasks(3);
             if (multJob.waitForCompletion(true)) {
                 hdfs.delete(inputPath, true);
                 hdfs.delete(transpOutputPath, true);

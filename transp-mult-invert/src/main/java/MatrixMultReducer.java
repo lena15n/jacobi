@@ -21,8 +21,6 @@ public class MatrixMultReducer
         double[] rowA = new double[columnsA];
         double[] columnB = new double[rowsB];
 
-        String[] keyData = key.toString().split(" ");
-        int i = Integer.valueOf(keyData[0]);
         for (Text value : values) {
             String[] data = value.toString().split(" ");
             if (data[0].equals("A")) {
@@ -34,7 +32,7 @@ public class MatrixMultReducer
 
         double aat = 0.0;
         for (int j = 0; j < rowA.length; j++) {
-            aat += 1.0 * rowA[j] * columnB[j];
+            aat += rowA[j] * columnB[j];
         }
 
         context.write(key, new Text(String.format("%.15f", aat)));

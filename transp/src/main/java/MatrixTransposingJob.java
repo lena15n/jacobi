@@ -1,4 +1,3 @@
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -16,14 +15,12 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.StringTokenizer;
-import java.util.TreeMap;
 
 public class MatrixTransposingJob {
 
-    public static class MatrixTransposingMapper extends Mapper<Text, Text, IntWritable, Text> {
+    public static class MatrixTransposingMapper
+            extends Mapper<Text, Text, IntWritable, Text> {
 
         private Logger LOG = Logger.getLogger(MatrixTransposingJob.MatrixTransposingMapper.class);
 
@@ -42,7 +39,8 @@ public class MatrixTransposingJob {
         }
     }
 
-    public static class MatrixTransposingReducer extends Reducer<IntWritable, Text, IntWritable, Text> {
+    public static class MatrixTransposingReducer
+            extends Reducer<IntWritable, Text, IntWritable, Text> {
         private Logger LOG = Logger.getLogger(MatrixTransposingJob.MatrixTransposingReducer.class);
 
         public void reduce(IntWritable key, Iterable<Text> values,
@@ -75,7 +73,6 @@ public class MatrixTransposingJob {
      * */
     public static void main(String[] args) throws Exception {
         final Log LOG = LogFactory.getLog(MatrixTransposingJob.class);
-        /*LOG.info("============= JACOBI: Starting job...");*/
 
         String localInputFile = args[0];
 
@@ -86,12 +83,11 @@ public class MatrixTransposingJob {
         Path outputPath = prepareOutputFolder(hdfs, args[1]);
 
         Job job = Job.getInstance(conf, "Matrix Transposing");
-        job.setJarByClass(MatrixTransposingJob.class);//.setJar("target/transp.jar");//.setJarByClass(MatrixTransposingJob.class);
+        job.setJarByClass(MatrixTransposingJob.class);
         job.setMapperClass(MatrixTransposingMapper.class);
         job.setReducerClass(MatrixTransposingReducer.class);
         job.setMapOutputKeyClass(IntWritable.class);
         job.setMapOutputValueClass(Text.class);
-        job.setNumReduceTasks(3);
         job.setInputFormatClass(KeyValueTextInputFormat.class); // key as Text, not LongWritable
         FileInputFormat.addInputPath(job, inputPath);
         FileOutputFormat.setOutputPath(job, outputPath);
